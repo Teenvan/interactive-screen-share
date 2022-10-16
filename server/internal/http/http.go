@@ -15,6 +15,7 @@ import (
 
 	"m1k1o/neko/internal/config"
 	"m1k1o/neko/internal/types"
+	"m1k1o/neko/internal/zoom"
 )
 
 type Server struct {
@@ -23,6 +24,8 @@ type Server struct {
 	http   *http.Server
 	conf   *config.Server
 }
+
+const contextHeader = "x-zoom-app-context"
 
 func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop types.DesktopManager) *Server {
 	logger := log.With().Str("module", "http").Logger()
@@ -44,6 +47,11 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 			logger.Warn().Err(err).Msg("failed to upgrade websocket conection")
 		}
 	})
+
+	// router.Get("/auth", func(w http.ResponseWriter, r *http.Request) {
+	// 	code := r.URL.Query().Get("code")
+
+	// })
 
 	router.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
 		password := r.URL.Query().Get("pwd")
@@ -105,8 +113,25 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 
 	fs := http.FileServer(http.Dir(conf.Static))
 	router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		if _, err := os.Stat(conf.Static + r.URL.Path); !os.IsNotExist(err) {
-			fs.ServeHTTP(w, r)
+		
+		header := r.Header.Get(contextHeader)
+		logger.Info().Msgf("%s", header)
+
+		if len(header) > 0 {
+			context, err := zoom.GetAppContext(header, "")
+		
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if len(context) > 0 {
+				if _, err := os.Stat(conf.Static + r.URL.Path); !os.IsNotExist(err) {
+					fs.ServeHTTP(w, r)
+				} else {
+					http.NotFound(w, r)
+				}
+			}
 		} else {
 			http.NotFound(w, r)
 		}
