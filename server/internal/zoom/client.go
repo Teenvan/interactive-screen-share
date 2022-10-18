@@ -130,6 +130,15 @@ func (c *Client) executeRequest(opts requestV2Opts, token string) (*http.Respons
 	return client.Do(req)
 }
 
+func (c *Client) addRequestAuth(req *http.Request, token string) (*http.Request, error) {
+
+	// set JWT Authorization header
+	req.Header.Add("Authorization", "Bearer "+token)
+
+	return req, nil
+}
+
+
 const GetTokenPath = "/oauth/token"
 
 // GetTokenOptions are the options for creating and getting an access token
@@ -204,5 +213,66 @@ func (c *Client) GetToken(code string) (string, error) {
 	return ret.AccessToken, nil
 }
 
+const GetDeepLinkPath = "/zoomapp/deeplink"
 
-// func TokenRequest(id string, secret string) (string, error) {}
+type GetDeepLinkOptions struct {
+	Action string `json:"action"`
+}
+
+type Action struct {
+	URL string `json:"url"`
+	RoleName string `json:"role_name"`
+	Verified int `json:"verified"`
+	RoleId int `json:"role_id"`
+}
+
+type DeepLinkResult struct {
+	DeepLink string `json:"deeplink"`
+}
+
+func (c *Client) GetDeepLink(token string) (string, error) {
+	ac := Action{
+		URL: "/",
+		RoleName: "Owner",
+		Verified: 1,
+		RoleId: 0,
+	}
+
+	acStr, err := json.Marshal(ac)
+	if err != nil {
+		return "", err
+	}
+
+	getDeepLinkOptions := GetDeepLinkOptions{
+		Action: string(acStr),
+	}
+
+	response, err := c.executeRequest(requestV2Opts{
+										Method: Post,
+										Path: GetDeepLinkPath,
+										DataParameters: getDeepLinkOptions}, token)
+
+	if err != nil {
+		return "", err
+	}
+
+	var ret DeepLinkResult
+
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if err := checkError(body); err != nil {
+		return "", err
+	}
+
+	// Unmarshall into the result
+	if err := json.Unmarshal(body, &ret); err != nil {
+		return "", err
+	}
+
+	return ret.DeepLink, nil
+}

@@ -114,7 +114,27 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 	router.Get("/auth", func (w http.ResponseWriter, r *http.Request)  {
 		code := r.URL.Query().Get("code")
 		logger.Info().Msgf("Code : %s", code)
-		http.Redirect(w, r, "/", http.StatusFound)
+		
+		zoomClient, err := zoom.NewClient()
+		if err != nil {
+			logger.Info().Err(err)
+		}
+
+		// Get access token from zoom
+		accessToken, err := zoomClient.GetToken(code)
+
+		if err != nil {
+			logger.Info().Err(err)
+		}
+
+		// Fetch deeplink from Zoom API
+		deeplink, err := zoomClient.GetDeepLink(accessToken)
+
+		if err != nil {
+			logger.Info().Err(err)
+		}
+
+		http.Redirect(w, r, deeplink, http.StatusFound)
 	})
 
 	fs := http.FileServer(http.Dir(conf.Static))
