@@ -16,6 +16,23 @@ const apiVersion = "/v2"
 
 type HTTPMethod string
 
+const (
+	// Get is GET HTTP method
+	Get HTTPMethod = http.MethodGet
+
+	// Post is POST HTTP method
+	Post HTTPMethod = http.MethodPost
+
+	// Put is PUT HTTP method
+	Put HTTPMethod = http.MethodPut
+
+	// Patch is PATCH HTTP method
+	Patch HTTPMethod = http.MethodPatch
+
+	// Delete is DELETE HTTP method
+	Delete HTTPMethod = http.MethodDelete
+)
+
 type Client struct {
 	Key string
 	Secret string
@@ -67,6 +84,8 @@ func (c *Client) httpClient() *http.Client {
 
 	return client
 }
+
+// func (c *Client) tokenRequest(opts requestV2Opts, id string, secret string) ()
 
 
 func (c *Client) httpRequest(opts requestV2Opts) (*http.Request, error) {
@@ -149,6 +168,3 @@ func (c *Client) requestV2HeadOnly(resp *http.Response) error {
 
 
 // func TokenRequest(id string, secret string) (string, error) {}
-
-
-func GetToken(code string, verifier string) {}

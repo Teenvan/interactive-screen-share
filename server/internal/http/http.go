@@ -111,9 +111,15 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 		_, _ = w.Write([]byte("true"))
 	})
 
+	router.Get("/auth", func (w http.ResponseWriter, r *http.Request)  {
+		code := r.URL.Query().Get("code")
+		logger.Info().Msgf("Code : %s", code)
+		http.Redirect(w, r, "/", http.StatusFound)
+	})
+
 	fs := http.FileServer(http.Dir(conf.Static))
 	router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		
+
 		header := r.Header.Get(contextHeader)
 		logger.Info().Msgf("%s", header)
 
