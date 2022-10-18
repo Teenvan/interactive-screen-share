@@ -26,6 +26,8 @@ require (
 )
 
 require (
+	github.com/golang-jwt/jwt/v4 v4.4.2
+	github.com/google/go-querystring v1.1.0
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

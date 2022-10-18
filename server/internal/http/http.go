@@ -121,11 +121,13 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 			context, err := zoom.GetAppContext(header, "")
 		
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+				logger.Info().Err(err)
 			}
 
 			if len(context) > 0 {
+				logger.Info().Msg(context)
+				logger.Info().Msg("App running inside Zoom")
+
 				if _, err := os.Stat(conf.Static + r.URL.Path); !os.IsNotExist(err) {
 					fs.ServeHTTP(w, r)
 				} else {
@@ -133,7 +135,11 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 				}
 			}
 		} else {
-			http.NotFound(w, r)
+			if _, err := os.Stat(conf.Static + r.URL.Path); !os.IsNotExist(err) {
+				fs.ServeHTTP(w, r)
+			} else {
+				http.NotFound(w, r)
+			}
 		}
 	})
 
