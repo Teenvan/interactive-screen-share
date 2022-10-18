@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/google/go-querystring/query"
 )
@@ -33,36 +35,28 @@ const (
 )
 
 type Client struct {
-	Key string
-	Secret string
 	Transport http.RoundTripper
 	Timeout time.Duration
 	endpoint string
-	zoomApp ZoomApp
+	logger zerolog.Logger
 }
 
 
 // NewClient returns a new API client
-func NewClient() (*Client, error) {
+func NewClient() *Client {
 	
-	zoomApp, err := GetZoomApp()
+	logger := log.With().Str("module", "zoom").Logger()
 	
-	if err != nil {
-		return nil, err
-	}
-
 	var uri = url.URL{
 		Scheme: "https",
-		Host: zoomApp.Host,
+		Host: "api.zoom.us",
 		Path: apiVersion,
 	}
 
 	return &Client{
-		Key: zoomApp.ClientID,
-		Secret: zoomApp.ClientSecret,
 		endpoint: uri.String(),
-		zoomApp: zoomApp,
-	}, nil
+		logger: logger,
+	}
 }
 
 type requestV2Opts struct {
@@ -143,37 +137,43 @@ const GetTokenPath = "/oauth/token"
 
 // GetTokenOptions are the options for creating and getting an access token
 type GetTokenOptions struct {
-	Code string `json:"code"`
-	GrantType string `json:"grant_type"`
-	RedirectUri string `json:"redirect_uri"`
+	Code string `url:"code"`
+	GrantType string `url:"grant_type"`
+	RedirectUri string `url:"redirect_uri"`
 }
 
 
 type AccessTokenResult struct {
 	AccessToken string `json:"access_token"`
-	TokenType string `json:"token_type"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn string `json:"expires_in"`
+	ExpiresIn int `json:"expires_in"`
 	Scope string `json:"scope"`
 }
 
 
 func (c *Client) GetToken(code string) (string, error) {
-	tokenOptions := GetTokenOptions{
-		Code: code,
-		GrantType: "authorization_code",
-		RedirectUri: c.zoomApp.RedirectURL,
-	}
+
+	c.logger.Info().Msg("Retrieving access token")
 
 	var buf bytes.Buffer
 
-	// encode token option parameters
-	if err := json.NewEncoder(&buf).Encode(tokenOptions); err != nil {
+	tokenOptions := GetTokenOptions{
+		Code: code,
+		GrantType: "authorization_code",
+		RedirectUri: "https://rides-centres-profit-disclaimer.trycloudflare.com/auth",
+	}
+
+	values, err := query.Values(tokenOptions)
+	if err != nil {
 		return "", err
 	}
 
 	// set request URL
-	requestURL := c.endpoint + GetTokenPath
+	requestURL := "https://zoom.us/oauth/token"
+	if len(values) > 0 {
+		requestURL += "?" + values.Encode()
+	}
+
+	c.logger.Info().Msgf("Request URL: %s", requestURL)
 
 	request, err := http.NewRequest(string(Post), requestURL, &buf)
 	
@@ -184,7 +184,7 @@ func (c *Client) GetToken(code string) (string, error) {
 	// Add form type
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	// Add authorization
-	request.SetBasicAuth(c.zoomApp.ClientID, c.zoomApp.ClientSecret)
+	request.SetBasicAuth("3HFvhLMeRZyz7K6Cjr62Q", "Y6edLK2mnAbDC78bOgoxgQt7DdQay03i")
 
 	response, err := c.httpClient().Do(request)
 
@@ -192,7 +192,7 @@ func (c *Client) GetToken(code string) (string, error) {
 		return "", err
 	}
 
-	var ret = AccessTokenResult{}
+	var ret AccessTokenResult
 	
 	defer response.Body.Close()
 
@@ -201,15 +201,19 @@ func (c *Client) GetToken(code string) (string, error) {
 		return "", err
 	}
 
+	c.logger.Info().Msgf("Response Body: %s", string(body))
+
 	if err := checkError(body); err != nil {
+		c.logger.Err(err).Msg("Error response returned from zoom api")
 		return "", err
 	}
 
 	// Unmarshall into the result
 	if err := json.Unmarshal(body, &ret); err != nil {
+		c.logger.Err(err).Msg("Unmarshall returned error")
 		return "", err
 	}
-
+	
 	return ret.AccessToken, nil
 }
 
@@ -264,6 +268,8 @@ func (c *Client) GetDeepLink(token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	log.Printf("Response Body: %s", string(body))
 
 	if err := checkError(body); err != nil {
 		return "", err

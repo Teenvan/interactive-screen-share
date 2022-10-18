@@ -47,12 +47,6 @@ func ContextDecrypter(context string, secretKey []byte) []byte {
 }
 
 func GetAppContext(header string, secret string) (string, error) {
-	zoomApp, err := GetZoomApp()
-
-	if err != nil {
-		return "", err
-	}
-
 	if len(header) == 0 {
 		return "", fmt.Errorf("context header must be a valid string")
 	}
@@ -61,7 +55,7 @@ func GetAppContext(header string, secret string) (string, error) {
 	if len(secret) > 0 {
 		key = secret		
 	} else {
-		key = zoomApp.ClientSecret;
+		key = "Y6edLK2mnAbDC78bOgoxgQt7DdQay03i";
 	}
 
 	// Decode and parse context

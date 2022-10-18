@@ -71,11 +71,32 @@ func GetZoomApp() (ZoomApp, error) {
 	}
 
 	zoomApp := ZoomApp{}
-	zoomApp.Host = config["ZM_HOST"]
-	zoomApp.ClientID = config["ZM_CLIENT_ID"]
-	zoomApp.ClientSecret = config["ZM_CLIENT_SECRET"]
-	zoomApp.RedirectURL = config["ZM_REDIRECT_URL"]
-	zoomApp.SessionSecret = config["SESSION_SECRET"]
+	
+	var zm_host string = "https://zoom.us"
+	var zm_client_id string = "3HFvhLMeRZyz7K6Cjr62Q"
+	var zm_client_secret string = "Y6edLK2mnAbDC78bOgoxgQt7DdQay03i"
+	var zm_redirect_url = "https://rides-centres-profit-disclaimer.trycloudflare.com/auth"
+
+	if len(config["ZM_HOST"]) != 0 {
+		zm_host = config["ZM_HOST"]
+	}
+
+	if len(config["ZM_CLIENT_ID"]) != 0 {
+		zm_client_id = config["ZM_CLIENT_ID"]
+	}
+
+	if len(config["ZM_CLIENT_SECRET"]) != 0 {
+		zm_client_secret = config["ZM_CLIENT_SECRET"]	
+	}
+
+	if len(config["ZM_REDIRECT_URL"]) != 0 {
+		zm_redirect_url = config["ZM_REDIRECT_URL"]
+	}
+
+	zoomApp.Host = zm_host
+	zoomApp.ClientID = zm_client_id
+	zoomApp.ClientSecret = zm_client_secret
+	zoomApp.RedirectURL = zm_redirect_url
 
 	return zoomApp, nil
 }

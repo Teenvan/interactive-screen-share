@@ -48,11 +48,6 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 		}
 	})
 
-	// router.Get("/auth", func(w http.ResponseWriter, r *http.Request) {
-	// 	code := r.URL.Query().Get("code")
-
-	// })
-
 	router.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
 		password := r.URL.Query().Get("pwd")
 		isAdmin, err := webSocketHandler.IsAdmin(password)
@@ -115,26 +110,23 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 		code := r.URL.Query().Get("code")
 		logger.Info().Msgf("Code : %s", code)
 		
-		zoomClient, err := zoom.NewClient()
-		if err != nil {
-			logger.Info().Err(err)
+		zoomClient := zoom.NewClient()
+
+		if zoomClient != nil {
+			// Get access token from zoom
+			accessToken, err := zoomClient.GetToken(code)
+
+			if err != nil {
+				logger.Err(err).Msg("Retrieving token failed")
+			}
+
+			deeplink, err := zoomClient.GetDeepLink(accessToken)
+			if err != nil {
+				logger.Err(err).Msg("Retrieving deep link failed")
+			}
+
+			http.Redirect(w, r, deeplink, http.StatusFound)
 		}
-
-		// Get access token from zoom
-		accessToken, err := zoomClient.GetToken(code)
-
-		if err != nil {
-			logger.Info().Err(err)
-		}
-
-		// Fetch deeplink from Zoom API
-		deeplink, err := zoomClient.GetDeepLink(accessToken)
-
-		if err != nil {
-			logger.Info().Err(err)
-		}
-
-		http.Redirect(w, r, deeplink, http.StatusFound)
 	})
 
 	fs := http.FileServer(http.Dir(conf.Static))
@@ -147,23 +139,32 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 			context, err := zoom.GetAppContext(header, "")
 		
 			if err != nil {
-				logger.Info().Err(err)
+				logger.Err(err).Msg("Get app context failed")
 			}
 
 			if len(context) > 0 {
 				logger.Info().Msg(context)
 				logger.Info().Msg("App running inside Zoom")
+				
+				logger.Info().Msg(conf.Static)
+				logger.Info().Msg(r.URL.Path)
 
 				if _, err := os.Stat(conf.Static + r.URL.Path); !os.IsNotExist(err) {
 					fs.ServeHTTP(w, r)
 				} else {
+					logger.Err(err).Msg("Error serving files")
 					http.NotFound(w, r)
 				}
 			}
 		} else {
+			logger.Info().Msg("Browser view")
+			logger.Info().Msg(conf.Static)
+			logger.Info().Msg(r.URL.Path)
+			
 			if _, err := os.Stat(conf.Static + r.URL.Path); !os.IsNotExist(err) {
 				fs.ServeHTTP(w, r)
 			} else {
+				logger.Err(err).Msg("Error serving files")
 				http.NotFound(w, r)
 			}
 		}
