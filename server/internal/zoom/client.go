@@ -3,7 +3,6 @@ package zoom
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -39,6 +38,7 @@ type Client struct {
 	Transport http.RoundTripper
 	Timeout time.Duration
 	endpoint string
+	zoomApp ZoomApp
 }
 
 
@@ -61,6 +61,7 @@ func NewClient() (*Client, error) {
 		Key: zoomApp.ClientID,
 		Secret: zoomApp.ClientSecret,
 		endpoint: uri.String(),
+		zoomApp: zoomApp,
 	}, nil
 }
 
@@ -112,9 +113,13 @@ func (c *Client) httpRequest(opts requestV2Opts) (*http.Request, error) {
 	return http.NewRequest(string(opts.Method), requestURL, &buf)
 }
 
-func (c *Client) executeRequest(opts requestV2Opts) (*http.Response, error) {
+func (c *Client) executeRequest(opts requestV2Opts, token string) (*http.Response, error) {
 	client := c.httpClient()
-	req, err := c.addRequestAuth(c.httpRequest(opts))
+	request, err := c.httpRequest(opts)
+	if err != nil {
+		return nil, err
+	}
+	req, err := c.addRequestAuth(request, token)
 	
 	if err != nil {
 		return nil, err
@@ -125,45 +130,78 @@ func (c *Client) executeRequest(opts requestV2Opts) (*http.Response, error) {
 	return client.Do(req)
 }
 
-func (c *Client) requestV2(opts requestV2Opts) error {
-	// execute HTTP request
-	resp, err := c.executeRequest(opts)
-	if err != nil {
-		return err
-	}
+const GetTokenPath = "/oauth/token"
 
-	// If there is no body in response
-	if opts.HeadResponse {
-		return c.requestV2HeadOnly(resp)
-	}
-
-	return c.requestV2WithBody(opts, resp)
+// GetTokenOptions are the options for creating and getting an access token
+type GetTokenOptions struct {
+	Code string `json:"code"`
+	GrantType string `json:"grant_type"`
+	RedirectUri string `json:"redirect_uri"`
 }
 
-func (c *Client) requestV2WithBody(opts requestV2Opts, resp *http.Response) error {
-	// read HTTP response
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
+
+type AccessTokenResult struct {
+	AccessToken string `json:"access_token"`
+	TokenType string `json:"token_type"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn string `json:"expires_in"`
+	Scope string `json:"scope"`
+}
+
+
+func (c *Client) GetToken(code string) (string, error) {
+	tokenOptions := GetTokenOptions{
+		Code: code,
+		GrantType: "authorization_code",
+		RedirectUri: c.zoomApp.RedirectURL,
 	}
 
-	// check for Zoom errors in the response
+	var buf bytes.Buffer
+
+	// encode token option parameters
+	if err := json.NewEncoder(&buf).Encode(tokenOptions); err != nil {
+		return "", err
+	}
+
+	// set request URL
+	requestURL := c.endpoint + GetTokenPath
+
+	request, err := http.NewRequest(string(Post), requestURL, &buf)
+	
+	if err != nil {
+		return "", err
+	}
+
+	// Add form type
+	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	// Add authorization
+	request.SetBasicAuth(c.zoomApp.ClientID, c.zoomApp.ClientSecret)
+
+	response, err := c.httpClient().Do(request)
+
+	if err != nil {
+		return "", err
+	}
+
+	var ret = AccessTokenResult{}
+	
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
 	if err := checkError(body); err != nil {
-		return err
+		return "", err
 	}
 
-	// unmarshal the response body into the return object
-	return json.Unmarshal(body, &opts.Ret)
-}
-
-func (c *Client) requestV2HeadOnly(resp *http.Response) error {
-	if resp.StatusCode != 204 {
-		return errors.New(resp.Status)
+	// Unmarshall into the result
+	if err := json.Unmarshal(body, &ret); err != nil {
+		return "", err
 	}
 
-	// there were no errors, just return
-	return nil
+	return ret.AccessToken, nil
 }
 
 
