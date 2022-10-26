@@ -75,7 +75,7 @@ func GetZoomApp() (ZoomApp, error) {
 	var zm_host string = "https://zoom.us"
 	var zm_client_id string = "3HFvhLMeRZyz7K6Cjr62Q"
 	var zm_client_secret string = "Y6edLK2mnAbDC78bOgoxgQt7DdQay03i"
-	var zm_redirect_url = "https://rides-centres-profit-disclaimer.trycloudflare.com/auth"
+	var zm_redirect_url = "https://3c97-137-220-76-2.eu.ngrok.io/auth"
 
 	if len(config["ZM_HOST"]) != 0 {
 		zm_host = config["ZM_HOST"]

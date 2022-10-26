@@ -34,6 +34,25 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 	router.Use(middleware.RequestID) // Create a request ID for each request
 	router.Use(middleware.RequestLogger(&logformatter{logger}))
 	router.Use(middleware.Recoverer) // Recover from panics without crashing server
+	
+	// Set middleware response header for Zoom app
+	router.Use(middleware.SetHeader("Strict-Transport-Security", "max-age=31536000"))
+	router.Use(middleware.SetHeader("X-Content-Type-Options", "nosniff"))
+	router.Use(middleware.SetHeader("Content-Security-Policy", `default-src 'self';
+	style-src 'report-sample' 'self' 'unsafe-inline';
+	script-src * 'self' https://appssdk.zoom.us 'unsafe-inline';
+	object-src 'none';
+	base-uri 'self';
+	connect-src * 'self' ws://3c97-137-220-76-2.eu.ngrok.io;
+	font-src * 'self';
+	frame-src 'self';
+	img-src 'self';
+	manifest-src 'self';
+	media-src 'self';
+	worker-src 'none';`))
+
+	router.Use(middleware.SetHeader("Referrer-Policy", "same-origin"))
+	router.Use(middleware.SetHeader("X-Frame-Option", "same-origin"))
 
 	if conf.PathPrefix != "/" {
 		router.Use(func(h http.Handler) http.Handler {
@@ -125,48 +144,16 @@ func New(conf *config.Server, webSocketHandler types.WebSocketHandler, desktop t
 				logger.Err(err).Msg("Retrieving deep link failed")
 			}
 
-			http.Redirect(w, r, deeplink, http.StatusFound)
+			http.Redirect(w, r, deeplink, http.StatusSeeOther)
 		}
 	})
 
 	fs := http.FileServer(http.Dir(conf.Static))
 	router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-
-		header := r.Header.Get(contextHeader)
-		logger.Info().Msgf("%s", header)
-
-		if len(header) > 0 {
-			context, err := zoom.GetAppContext(header, "")
-		
-			if err != nil {
-				logger.Err(err).Msg("Get app context failed")
-			}
-
-			if len(context) > 0 {
-				logger.Info().Msg(context)
-				logger.Info().Msg("App running inside Zoom")
-				
-				logger.Info().Msg(conf.Static)
-				logger.Info().Msg(r.URL.Path)
-
-				if _, err := os.Stat(conf.Static + r.URL.Path); !os.IsNotExist(err) {
-					fs.ServeHTTP(w, r)
-				} else {
-					logger.Err(err).Msg("Error serving files")
-					http.NotFound(w, r)
-				}
-			}
+		if _, err := os.Stat(conf.Static + r.URL.Path); !os.IsNotExist(err) {
+			fs.ServeHTTP(w, r)
 		} else {
-			logger.Info().Msg("Browser view")
-			logger.Info().Msg(conf.Static)
-			logger.Info().Msg(r.URL.Path)
-			
-			if _, err := os.Stat(conf.Static + r.URL.Path); !os.IsNotExist(err) {
-				fs.ServeHTTP(w, r)
-			} else {
-				logger.Err(err).Msg("Error serving files")
-				http.NotFound(w, r)
-			}
+			http.NotFound(w, r)
 		}
 	})
 

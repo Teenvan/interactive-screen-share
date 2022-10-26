@@ -159,7 +159,7 @@ func (c *Client) GetToken(code string) (string, error) {
 	tokenOptions := GetTokenOptions{
 		Code: code,
 		GrantType: "authorization_code",
-		RedirectUri: "https://rides-centres-profit-disclaimer.trycloudflare.com/auth",
+		RedirectUri: "https://3c97-137-220-76-2.eu.ngrok.io/auth",
 	}
 
 	values, err := query.Values(tokenOptions)
