@@ -68,7 +68,7 @@
       }
 
       .video-container {
-        background: rgba($color: #000, $alpha: 0.4);
+        background: rgba($color: rgb(239, 250, 252), $alpha: 0.4);
         max-width: 100%;
         flex-grow: 1;
         display: flex;
